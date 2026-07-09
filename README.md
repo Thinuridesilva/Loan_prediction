@@ -60,7 +60,7 @@ Six new features were derived from existing columns:
 ```
 Loan_prediction/
 ├── src/
-│   └── loan_default_pipeline.py   # Full pipeline
+│   └── loan_prediction.py   # Full pipeline
 ├── loan_api/
 │   ├── main.py                    # FastAPI app
 │   ├── Dockerfile
