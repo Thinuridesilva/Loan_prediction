@@ -199,18 +199,4 @@ mlflow ui
 - [ ] GitHub Actions CI/CD pipeline
 - [ ] Streamlit dashboard for interactive predictions
 
----
 
-## 👩‍💻 Author
-
-**Thinuri Desilva**
-Undergraduate — BSc Engineering
-Interested in ML Engineering internships
-
-[![GitHub](https://img.shields.io/badge/GitHub-Thinuridesilva-black?logo=github)](https://github.com/Thinuridesilva)
-
----
-
-## 📄 License
-
-This project is licensed under the MIT License.
