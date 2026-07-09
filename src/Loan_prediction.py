@@ -447,3 +447,194 @@ Output files:
 
 MLflow UI:  run  'mlflow ui'  in terminal
 """)
+
+
+# =============================================================
+# EXTRA 1 — MODEL COMPARISON (LightGBM + Logistic Regression)
+# =============================================================
+!pip install lightgbm -q
+
+from lightgbm import LGBMClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import roc_auc_score, classification_report
+
+# Logistic Regression
+print("Training Logistic Regression...")
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train_res)
+X_test_scaled  = scaler.transform(X_test)
+
+lr_model = LogisticRegression(max_iter=1000, random_state=42, n_jobs=-1)
+lr_model.fit(X_train_scaled, y_train_res)
+
+# LightGBM
+print("Training LightGBM...")
+lgbm_model = LGBMClassifier(
+    n_estimators=300,
+    learning_rate=0.05,
+    max_depth=6,
+    num_leaves=63,
+    subsample=0.8,
+    colsample_bytree=0.8,
+    random_state=42,
+    n_jobs=-1,
+    verbose=-1
+)
+lgbm_model.fit(X_train_res, y_train_res)
+
+# Compare all 4 models
+print("\n" + "=" * 60)
+print("FULL MODEL COMPARISON")
+print("=" * 60)
+
+models = {
+    "Logistic Regression" : (lr_model,   X_test_scaled),
+    "Random Forest"       : (rf_model,   X_test),
+    "LightGBM"            : (lgbm_model, X_test),
+    "XGBoost"             : (xgb_model,  X_test),
+}
+
+comparison = []
+for name, (model, X_eval) in models.items():
+    preds = model.predict(X_eval)
+    proba = model.predict_proba(X_eval)[:, 1]
+    auc   = roc_auc_score(y_test, proba)
+    from sklearn.metrics import precision_score, recall_score, f1_score
+    comparison.append({
+        "Model"    : name,
+        "AUC-ROC"  : round(auc, 4),
+        "Precision": round(precision_score(y_test, preds), 4),
+        "Recall"   : round(recall_score(y_test, preds), 4),
+        "F1"       : round(f1_score(y_test, preds), 4),
+    })
+
+comparison_df = pd.DataFrame(comparison).sort_values("AUC-ROC", ascending=False)
+print(comparison_df.to_string(index=False))
+
+fig, ax = plt.subplots(figsize=(10, 5))
+bars = ax.bar(comparison_df["Model"], comparison_df["AUC-ROC"],
+              color=["#E24B4A","#3B8BD4","#1D9E75","#F5A623"],
+              edgecolor="white", linewidth=0.8)
+for bar, val in zip(bars, comparison_df["AUC-ROC"]):
+    ax.text(bar.get_x() + bar.get_width()/2,
+            bar.get_height() + 0.003,
+            str(val), ha="center", fontsize=11, fontweight="bold")
+ax.set_title("Model Comparison — AUC-ROC", fontsize=13)
+ax.set_ylabel("AUC-ROC")
+ax.set_ylim(0.5, 0.85)
+plt.tight_layout()
+plt.savefig(f"{SAVE_DIR}/plot_12_model_comparison.png", dpi=150)
+plt.show()
+print("Saved: plot_12_model_comparison.png")
+
+# =============================================================
+# EXTRA 2 — THRESHOLD TUNING FOR BUSINESS COST
+# =============================================================
+FN_COST = 10000
+FP_COST = 500
+
+proba_xgb = xgb_model.predict_proba(X_test)[:, 1]
+thresholds = np.arange(0.01, 1.0, 0.01)
+
+costs, precisions, recalls, f1s = [], [], [], []
+
+for thresh in thresholds:
+    preds_t = (proba_xgb >= thresh).astype(int)
+    from sklearn.metrics import confusion_matrix
+    tn, fp, fn, tp = confusion_matrix(y_test, preds_t).ravel()
+    total_cost = (fn * FN_COST) + (fp * FP_COST)
+    costs.append(total_cost)
+    precisions.append(precision_score(y_test, preds_t, zero_division=0))
+    recalls.append(recall_score(y_test, preds_t, zero_division=0))
+    f1s.append(f1_score(y_test, preds_t, zero_division=0))
+
+optimal_idx       = np.argmin(costs)
+optimal_threshold = thresholds[optimal_idx]
+
+print(f"Default threshold (0.5):")
+preds_default = (proba_xgb >= 0.5).astype(int)
+tn, fp, fn, tp = confusion_matrix(y_test, preds_default).ravel()
+print(f"  FN: {fn} | FP: {fp} | Total cost: ${fn*FN_COST + fp*FP_COST:,}")
+
+print(f"\nOptimal threshold ({optimal_threshold:.2f}):")
+preds_optimal = (proba_xgb >= optimal_threshold).astype(int)
+tn, fp, fn, tp = confusion_matrix(y_test, preds_optimal).ravel()
+print(f"  FN: {fn} | FP: {fp} | Total cost: ${fn*FN_COST + fp*FP_COST:,}")
+print(f"  Precision: {precision_score(y_test, preds_optimal):.4f}")
+print(f"  Recall:    {recall_score(y_test, preds_optimal):.4f}")
+print(f"  F1:        {f1_score(y_test, preds_optimal):.4f}")
+
+fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+ax = axes[0]
+ax.plot(thresholds, [c/1e6 for c in costs], color="#E24B4A", linewidth=2)
+ax.axvline(optimal_threshold, color="#1D9E75", linestyle="--",
+           linewidth=2, label=f"Optimal = {optimal_threshold:.2f}")
+ax.axvline(0.5, color="gray", linestyle="--",
+           linewidth=1.5, label="Default = 0.50")
+ax.set_title("Business Cost vs Threshold", fontsize=12)
+ax.set_xlabel("Threshold")
+ax.set_ylabel("Total Cost ($M)")
+ax.legend()
+
+ax = axes[1]
+ax.plot(thresholds, precisions, label="Precision", color="#3B8BD4", linewidth=2)
+ax.plot(thresholds, recalls,    label="Recall",    color="#E24B4A", linewidth=2)
+ax.plot(thresholds, f1s,        label="F1",        color="#1D9E75", linewidth=2)
+ax.axvline(optimal_threshold, color="gray", linestyle="--",
+           linewidth=1.5, label=f"Optimal = {optimal_threshold:.2f}")
+ax.set_title("Precision / Recall / F1 vs Threshold", fontsize=12)
+ax.set_xlabel("Threshold")
+ax.legend()
+
+plt.tight_layout()
+plt.savefig(f"{SAVE_DIR}/plot_13_threshold_tuning.png", dpi=150)
+plt.show()
+print(f"Optimal threshold: {optimal_threshold:.2f}")
+print("Saved: plot_13_threshold_tuning.png")
+
+# =============================================================
+# EXTRA 3 — OPTUNA HYPERPARAMETER TUNING
+# =============================================================
+!pip install optuna -q
+
+import optuna
+optuna.logging.set_verbosity(optuna.logging.WARNING)
+
+def objective(trial):
+    params = {
+        "n_estimators"     : trial.suggest_int("n_estimators", 100, 500),
+        "max_depth"        : trial.suggest_int("max_depth", 3, 9),
+        "learning_rate"    : trial.suggest_float("learning_rate", 0.01, 0.3, log=True),
+        "subsample"        : trial.suggest_float("subsample", 0.6, 1.0),
+        "colsample_bytree" : trial.suggest_float("colsample_bytree", 0.6, 1.0),
+        "min_child_weight" : trial.suggest_int("min_child_weight", 1, 10),
+        "gamma"            : trial.suggest_float("gamma", 0, 0.5),
+        "reg_alpha"        : trial.suggest_float("reg_alpha", 0, 1.0),
+        "reg_lambda"       : trial.suggest_float("reg_lambda", 0.5, 2.0),
+        "eval_metric"      : "logloss",
+        "random_state"     : 42,
+        "n_jobs"           : -1,
+    }
+    model = XGBClassifier(**params)
+    model.fit(X_train_res, y_train_res, verbose=False)
+    proba = model.predict_proba(X_test)[:, 1]
+    return roc_auc_score(y_test, proba)
+
+print("Running Optuna — 30 trials...")
+study = optuna.create_study(direction="maximize")
+study.optimize(objective, n_trials=30, show_progress_bar=True)
+
+print(f"Best AUC-ROC: {study.best_value:.4f}")
+print(f"Best params : {study.best_params}")
+
+xgb_tuned = XGBClassifier(**study.best_params, random_state=42, n_jobs=-1)
+xgb_tuned.fit(X_train_res, y_train_res)
+
+proba_tuned = xgb_tuned.predict_proba(X_test)[:, 1]
+preds_tuned = xgb_tuned.predict(X_test)
+print(f"Tuned XGBoost AUC-ROC : {roc_auc_score(y_test, proba_tuned):.4f}")
+print(f"Tuned XGBoost F1      : {f1_score(y_test, preds_tuned):.4f}")
+
+joblib.dump(xgb_tuned, f"{SAVE_DIR}/xgb_tuned_model.pkl")
+print("Saved tuned model to Drive")
