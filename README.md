@@ -60,13 +60,10 @@ Financial institutions lose billions annually to loan defaults. This project bui
 ## 🗂️ Project Structure
 
 ```
-loan-default-prediction/
+Loan_prediction/
 │
 ├── src/
 │   └── loan_default_pipeline.py   # Full pipeline (EDA → training → SHAP → MLflow)
-│
-├── notebooks/
-│   └── 01_eda_modeling.ipynb      # Jupyter/Colab notebook version
 │
 ├── outputs/
 │   ├── feature_importance.csv     # SHAP-ranked feature importance
@@ -127,20 +124,20 @@ Class imbalance (88/12 split) was handled with **SMOTE** on the training set onl
 
 ## 📈 Results
 
-| Model | AUC-ROC | Precision | Recall | F1 |
-|---|---|---|---|---|
-| XGBoost | 0.7349 | 0.39 | 0.19 | 0.25 |
-| Random Forest | 0.7075 | 0.26 | 0.32 | 0.29 |
+| Model | AUC-ROC | Precision (Default) | Recall (Default) | F1 (Default) | Accuracy |
+|---|---|---|---|---|---|
+| XGBoost | 0.7349 | 0.39 | 0.19 | 0.25 | 0.87 |
+| Random Forest | 0.7075 | 0.26 | 0.32 | 0.29 | 0.81 |
 
----
+> ✅ **XGBoost** is the best performing model with AUC-ROC of **0.7349**.
 
-**Top 5 features by SHAP value:**
+### Confusion Matrix — XGBoost
+| | Predicted No Default | Predicted Default |
+|---|---|---|
+| **Actual No Default** | 43,444 ✅ | 1,695 ❌ |
+| **Actual Default** | 4,831 ❌ | 1,100 ✅ |
 
-1. `InterestRate` — higher rate = much higher default risk
-2. `DTIRatio` — debt burden is the strongest financial signal
-3. `LoanToIncome` — derived feature showing affordability
-4. `CreditScore` — lower score strongly associated with default
-5. `MonthsEmployed` — employment stability matters
+> The low Default recall (0.19) is expected with a heavily imbalanced dataset (88/12 split). SMOTE was applied to the training set to partially address this.
 
 ---
 
@@ -150,9 +147,15 @@ SHAP (SHapley Additive exPlanations) was used to explain both global model behav
 
 **Global feature importance (beeswarm):**
 
-![SHAP Beeswarm](outputs/plot_08_shap_beeswarm.png)
+![SHAP Beeswarm](outputs/plots/plot_08_shap_beeswarm.png)
 
-**Single prediction waterfall (for a defaulter):**
+**ROC Curve & Precision-Recall Curve:**
+
+![ROC and PR Curves](outputs/plots/plot_06_roc_pr_curves.png)
+
+**Single prediction waterfall (for a real defaulter in the test set):**
+
+![SHAP Waterfall](outputs/plots/plot_10_shap_waterfall_defaulter.png)
 
 > Each bar shows how much a feature pushed the prediction toward default (red) or away from it (blue).
 
@@ -183,4 +186,31 @@ python src/loan_default_pipeline.py
 ```bash
 mlflow ui
 # Open http://localhost:5000
+```
 
+---
+
+## 🔮 Future Work
+
+- [ ] FastAPI REST endpoint for real-time predictions
+- [ ] Docker containerization for deployment
+- [ ] Optuna hyperparameter tuning
+- [ ] Threshold optimization for business cost minimization
+- [ ] GitHub Actions CI/CD pipeline
+- [ ] Streamlit dashboard for interactive predictions
+
+---
+
+## 👩‍💻 Author
+
+**Thinuri Desilva**
+Undergraduate — BSc Engineering
+Interested in ML Engineering internships
+
+[![GitHub](https://img.shields.io/badge/GitHub-Thinuridesilva-black?logo=github)](https://github.com/Thinuridesilva)
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License.
