@@ -129,10 +129,9 @@ Class imbalance (88/12 split) was handled with **SMOTE** on the training set onl
 
 | Model | AUC-ROC | Precision | Recall | F1 |
 |---|---|---|---|---|
-| XGBoost | ~0.XX | ~0.XX | ~0.XX | ~0.XX |
-| Random Forest | ~0.XX | ~0.XX | ~0.XX | ~0.XX |
+| XGBoost | 0.7349 | 0.39 | 0.19 | 0.25 |
+| Random Forest | 0.7075 | 0.26 | 0.32 | 0.29 |
 
-> 📝 Update the table above with your actual scores after running the pipeline.
 
 **Top 5 features by SHAP value:**
 
