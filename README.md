@@ -132,6 +132,7 @@ Class imbalance (88/12 split) was handled with **SMOTE** on the training set onl
 | XGBoost | 0.7349 | 0.39 | 0.19 | 0.25 |
 | Random Forest | 0.7075 | 0.26 | 0.32 | 0.29 |
 
+---
 
 **Top 5 features by SHAP value:**
 
